@@ -66,4 +66,6 @@ object ULID {
 
 }
 
-case class ULID(value: String) {}
+case class ULID(value: String) {
+  def asString: String = value
+}

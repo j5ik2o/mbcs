@@ -81,7 +81,7 @@ class ShardedIdWorkerSpec
         enterBarrier("singletonManager start")
         runOn(node1, node2, node3) {
           val ddWorkerIdControllerProxy = system.actorOf(IdWorkerIdControllerProxy.props(ULID.generate))
-          ShardedIdWorkers.start(IdWorkerConfig(dataCenterId = 1L), ddWorkerIdControllerProxy)
+          ShardedIdWorkers.startShardRegion(IdWorkerConfig(dataCenterId = 1L), ddWorkerIdControllerProxy)
           val shardedIdWorkers = system.actorOf(ShardedIdWorkers.props)
           shardedIdWorkers ! GenerateId(ULID.generate)
           val result = expectMsgClass(classOf[IdGenerated])

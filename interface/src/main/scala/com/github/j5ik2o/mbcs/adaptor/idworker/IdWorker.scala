@@ -82,12 +82,17 @@ object IdWorker {
   def props(idWorkerConfig: IdWorkerConfig, idWorkerIdController: ActorRef) =
     Props(new IdWorker(idWorkerConfig, idWorkerIdController))
 
-  case class GenerateId(id: ULID)
+  def name(id: ULID): String = s"id-worker-${id.asString}"
+
+  trait CommandRequest {
+    def idWorkerId: ULID
+  }
+  case class GenerateId(idWorkerId: ULID) extends CommandRequest
   case class IdGenerated(id: Long)
 
 }
 
-class IdWorker(val idWorkerConfig: IdWorkerConfig, idWorkerIdController: ActorRef)
+class IdWorker(val idWorkerConfig: IdWorkerConfig, idWorkerIdController: ActorRef, heartbeatDuration: FiniteDuration = 1 seconds)
     extends Actor
     with ActorLogging
     with Stash {
@@ -116,7 +121,7 @@ class IdWorker(val idWorkerConfig: IdWorkerConfig, idWorkerIdController: ActorRe
       snowfalke = new Snowfalke(idWorkerConfig, workerId)
       unstashAll()
       context.become(ready)
-      context.system.scheduler.schedule(0 seconds, 3 seconds, self, Ping(workerId))
+      context.system.scheduler.schedule(0 seconds, heartbeatDuration, self, Ping(workerId))
     case m: Pong =>
       log.debug(m.toString)
     case m: Ping =>

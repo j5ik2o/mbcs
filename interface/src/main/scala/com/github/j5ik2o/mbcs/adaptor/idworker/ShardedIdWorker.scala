@@ -27,7 +27,7 @@ object ShardedIdWorker {
 
   val extractShardId: ShardRegion.ExtractShardId = {
     case cmd: GenerateId =>
-      (CRC64.fromBytes(cmd.id.value.getBytes(StandardCharsets.UTF_8)).getValue % 8).toString
+      (CRC64.fromBytes(cmd.idWorkerId.value.getBytes(StandardCharsets.UTF_8)).getValue % 8).toString
   }
 
 }

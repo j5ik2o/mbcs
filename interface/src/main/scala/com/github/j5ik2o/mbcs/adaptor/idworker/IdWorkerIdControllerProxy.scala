@@ -1,19 +1,14 @@
 package com.github.j5ik2o.mbcs.adaptor.idworker
 
-import akka.actor.{ Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Props }
-import akka.cluster.singleton.{
-  ClusterSingletonManager,
-  ClusterSingletonManagerSettings,
-  ClusterSingletonProxy,
-  ClusterSingletonProxySettings
-}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Props, SupervisorStrategy}
+import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings, ClusterSingletonProxy, ClusterSingletonProxySettings}
 import com.github.j5ik2o.mbcs.domain.model.ULID
 
 object IdWorkerIdControllerSingleton {
 
   def singletonManager(minId: Long, maxId: Long)(implicit system: ActorSystem): ActorRef = system.actorOf(
     ClusterSingletonManager.props(
-      IdWorkerIdController.props(minId, maxId),
+      Props(new SupervisorActor(IdWorkerIdController.props(minId, maxId), SupervisorStrategy.defaultStrategy)),
       PoisonPill,
       ClusterSingletonManagerSettings(system).withRole(None)
     ),
@@ -45,7 +40,6 @@ class IdWorkerIdControllerProxy(id: ULID) extends Actor with ActorLogging {
 
   override def receive: Receive = {
     case msg =>
-      log.debug(s"msg = $msg")
       idWorkerIdController forward msg
   }
 

@@ -1,16 +1,17 @@
 package com.github.j5ik2o.mbcs.adaptor.idworker
 
-import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
-import akka.cluster.sharding.{ ClusterSharding, ClusterShardingSettings }
+import akka.actor.{Actor, ActorRef, ActorSystem, Props, SupervisorStrategy}
+import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
 
 object ShardedIdWorkers {
   def props: Props = Props(new ShardedIdWorkers())
   def name: String = "sharded-id-workers"
 
-  def start(idWorkerConfig: IdWorkerConfig, idWorkerIdController: ActorRef)(implicit system: ActorSystem): ActorRef = {
+  def startShardRegion(idWorkerConfig: IdWorkerConfig,
+                       idWorkerIdController: ActorRef)(implicit system: ActorSystem): ActorRef = {
     val actorRef = ClusterSharding(system).start(
       ShardedIdWorker.shardName,
-      ShardedIdWorker.props(idWorkerConfig, idWorkerIdController),
+      Props(new SupervisorActor(ShardedIdWorker.props(idWorkerConfig, idWorkerIdController), SupervisorStrategy.defaultStrategy)),
       ClusterShardingSettings(system),
       ShardedIdWorker.extractEntityId,
       ShardedIdWorker.extractShardId
@@ -18,14 +19,14 @@ object ShardedIdWorkers {
     actorRef
   }
 
-  def shardRegion(system: ActorSystem): ActorRef =
+  def getShardRegionRef(system: ActorSystem): ActorRef =
     ClusterSharding(system).shardRegion(ShardedIdWorker.shardName)
 
 }
 
 class ShardedIdWorkers extends Actor {
 
-  private val shardRegion = ShardedIdWorkers.shardRegion(context.system)
+  private val shardRegion = ShardedIdWorkers.getShardRegionRef(context.system)
 
   override def receive: Receive = {
     case msg =>
