@@ -3,9 +3,9 @@ import sbt._
 object Dependencies {
 
   object Versions {
-    val akka                = "2.5.9"
+    val akka                = "2.5.20"
     val akkaHttp            = "10.0.11"
-    val circe               = "0.9.1"
+    val circe               = "0.11.1"
     val slick               = "3.2.0"
     val typeSafeConfig      = "1.3.1"
     val hashids             = "1.0.3"
@@ -13,17 +13,18 @@ object Dependencies {
     val logback             = "1.2.3"
     val scalaTest           = "3.0.4"
     val mySQLConnectorJava  = "5.1.42"
-    val akkaPersistenceJDBC = "3.2.0"
     val levelDB             = "0.7"
     val levelDBJNIAll       = "1.8"
     val scalaTestPlusDB     = "1.0.5"
     val commonsIO           = "2.6"
-    val akkaHttpCirce       = "1.20.0-RC2"
+    val akkaHttpCirce       = "1.25.2"
     val baseUnits           = "0.1.21"
     val pureConfig          = "0.9.0"
     val scalaCheck          = "1.13.5"
     val monocle             = "1.5.0"
     val enumeratum          = "1.5.12"
+    val akkaPersistenceDynamoDB = "1.0.1"
+    val reactiveAwsDynamoDB = "1.0.6"
   }
 
   object Hashids {
@@ -83,7 +84,9 @@ object Dependencies {
 
     val parser = "io.circe" %% "circe-parser" % Versions.circe
 
-    val all = Seq(core, generic, parser)
+   val java8 =  "io.circe" %% "circe-java8" % Versions.circe
+
+    val all = Seq(core, generic, parser, java8)
   }
 
   object MySQL {
@@ -94,19 +97,10 @@ object Dependencies {
     val akkaHttpCirce = "de.heikoseeberger" %% "akka-http-circe" % Versions.akkaHttpCirce
   }
 
-  object Dnvriend {
-    val akkaPersistenceJBDC = "com.github.dnvriend" %% "akka-persistence-jdbc" % Versions.akkaPersistenceJDBC
-  }
-
-  object LevelDB {
-    val levelDB       = "org.iq80.leveldb" % "leveldb" % Versions.levelDB
-    val levelDBJNIAll = "org.fusesource.leveldbjni" % "leveldbjni-all" % Versions.levelDBJNIAll
-    val all           = Seq(levelDB, levelDBJNIAll)
-  }
-
   object J5ik2o {
     val scalaTestPlusDB = "com.github.j5ik2o" %% "scalatestplus-db" % Versions.scalaTestPlusDB
-
+    val akkaPersistenceDynamoDB = "com.github.j5ik2o" %% "akka-persistence-dynamodb" % Versions.akkaPersistenceDynamoDB
+   val reactiveAwsDynamoDBTest = "com.github.j5ik2o" %% "reactive-aws-dynamodb-test"     % Versions.reactiveAwsDynamoDB
   }
 
   object Commons {
@@ -134,6 +128,10 @@ object Dependencies {
 
   object Scaldi {
     val scaladi = "org.scaldi" %% "scaldi" % "0.5.8"
+  }
+  
+  object Google {
+    val guava = "com.google.guava"   % "guava"                       % "27.0.1-jre"
   }
 
 }

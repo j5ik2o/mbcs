@@ -35,10 +35,12 @@ val baseSettings = Seq(
   scalafmtVersion in ThisBuild := "1.4.0",
   scalafmtOnCompile in ThisBuild := true,
   resolvers ++= Seq(
-    Resolver.jcenterRepo
+    Resolver.jcenterRepo,
+    Resolver.bintrayRepo("tanukkii007", "maven")
   ),
   libraryDependencies ++= Seq(
-    )
+    ScalaTest.scalaTest % Test
+  )
 )
 
 val `infrastructure` = (project in file("infrastructure"))
@@ -150,15 +152,18 @@ val `interface` = (project in file("interface"))
       TypeSafe.Akka.persistence,
       TypeSafe.Akka.http,
       Heikoseeberger.akkaHttpCirce,
-      Dnvriend.akkaPersistenceJBDC,
-      LevelDB.levelDB,
-      LevelDB.levelDBJNIAll,
+      J5ik2o.akkaPersistenceDynamoDB,
+      Google.guava,
+      ScalaTest.scalaTest            % Test,
       TypeSafe.Akka.testKit          % Test,
       TypeSafe.Akka.multiNodeTestKit % Test,
       TypeSafe.Akka.httpTestKit      % Test,
       Commons.io                     % Test,
       J5ik2o.scalaTestPlusDB         % Test,
-      Logback.classic                % Test
+      Logback.classic                % Test,
+      J5ik2o.reactiveAwsDynamoDBTest % Test,
+      "org.slf4j"         % "jul-to-slf4j"                    % "1.7.26" % Test,
+      "net.boeckling" % "crc-64" % "1.0.0"
     ),
     parallelExecution in Test := false,
     // fork in Test := true,
@@ -195,7 +200,7 @@ val `interface` = (project in file("interface"))
     outputDirectoryMapper in generator := {
       case s if s.endsWith("Spec") => (sourceDirectory in Test).value
       case s =>
-        new java.io.File((scalaSource in Compile).value, "/com/github/j5ik2o/bank/adaptor/dao")
+        new java.io.File((scalaSource in Compile).value, "/com/github/j5ik2o/mbcs/adaptor/dao")
     },
     // モデル名に対してどのテンプレートを利用するか指定できます。
     templateNameMapper in generator := {
@@ -240,12 +245,21 @@ val `interface` = (project in file("interface"))
   .configs(MultiJvm)
   .dependsOn(`use-case`)
 
+val akkaManagementVersion = "0.18.0"
+
 val `api-server` = (project in file("api-server"))
+  .enablePlugins(JavaServerAppPackaging, DockerPlugin)
   .settings(baseSettings)
   .settings(
     name := "mbcs-api-server",
     libraryDependencies ++= Seq(
-      Logback.classic
+      Logback.classic,
+      "com.github.TanUkkii007" %% "akka-cluster-custom-downing" % "0.0.12",
+      "com.lightbend.akka.discovery" %% "akka-discovery-kubernetes-api" % akkaManagementVersion,
+      "com.lightbend.akka.management" %% "akka-management" % akkaManagementVersion,
+      "com.lightbend.akka.management" %% "akka-management-cluster-http" % akkaManagementVersion,
+      "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaManagementVersion,
+      "com.lightbend.akka.discovery" %% "akka-discovery-dns" % akkaManagementVersion,
     )
   )
   .dependsOn(`interface`, `domain`)

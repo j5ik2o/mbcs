@@ -1,8 +1,7 @@
 package com.github.j5ik2o.mbcs.domain.model
 
-
-object ULID{
- val ENCODE_TABLE: Array[Char] = Array('0',
+object ULID {
+  val ENCODE_TABLE: Array[Char] = Array('0',
                                         '1',
                                         '2',
                                         '3',
@@ -34,19 +33,19 @@ object ULID{
                                         'x',
                                         'y',
                                         'z')
-  val TIME_LENGTH = 10
-  val RANDOM_LENGTH = 16
+  val TIME_LENGTH               = 10
+  val RANDOM_LENGTH             = 16
   val RANDOM_MULTIPLIER: Double = Math.pow(2, 40)
 
   private def encode(buffer: StringBuilder, value: Long, length: Int): Unit = {
-    def loop(index: Int, acc: StringBuilder, value: Long) : String= {
-        index match {
-          case 0 => acc.result()
-          case n =>
-            val remainder = (value % ENCODE_TABLE.length).asInstanceOf[Int]
-            acc.append(ENCODE_TABLE(remainder))
-            loop(n - 1, acc, (value - remainder) / ENCODE_TABLE.length)
-        }
+    def loop(index: Int, acc: StringBuilder, value: Long): String = {
+      index match {
+        case 0 => acc.result()
+        case n =>
+          val remainder = (value % ENCODE_TABLE.length).asInstanceOf[Int]
+          acc.append(ENCODE_TABLE(remainder))
+          loop(n - 1, acc, (value - remainder) / ENCODE_TABLE.length)
+      }
     }
     loop(length, buffer, value)
   }
@@ -58,7 +57,7 @@ object ULID{
     encode(buffer, (Math.random * RANDOM_MULTIPLIER).asInstanceOf[Long], RANDOM_LENGTH / 2)
   }
 
-  def generate: ULID  = {
+  def generate: ULID = {
     val builder = new StringBuilder
     encodeRandom(builder)
     encodeTime(builder)
@@ -67,6 +66,4 @@ object ULID{
 
 }
 
-case class ULID(value: String) {
-
-}
+case class ULID(value: String) {}
