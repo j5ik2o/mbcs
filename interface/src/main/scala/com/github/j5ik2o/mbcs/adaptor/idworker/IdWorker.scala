@@ -1,6 +1,6 @@
 package com.github.j5ik2o.mbcs.adaptor.idworker
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props, Stash}
+import akka.actor.{Actor, ActorLogging, ActorRef, Cancellable, Props, Stash}
 import com.github.j5ik2o.mbcs.adaptor.idworker.IdWorker.{GenerateId, IdGenerated}
 import com.github.j5ik2o.mbcs.adaptor.idworker.IdWorkerIdController.Protocol._
 import com.github.j5ik2o.mbcs.domain.model.ULID
@@ -99,6 +99,7 @@ class IdWorker(val idWorkerConfig: IdWorkerConfig, idWorkerIdController: ActorRe
   import context.dispatcher
 
   private var snowfalke: Snowfalke = _
+  private var cancelable: Cancellable = _
 
   override def preStart(): Unit = {
     super.preStart()
@@ -106,6 +107,7 @@ class IdWorker(val idWorkerConfig: IdWorkerConfig, idWorkerIdController: ActorRe
   }
 
   override def postStop(): Unit = {
+    cancelable.cancel()
     idWorkerIdController ! ReturnId(snowfalke.workerId)
     super.postStop()
   }
@@ -121,7 +123,7 @@ class IdWorker(val idWorkerConfig: IdWorkerConfig, idWorkerIdController: ActorRe
       snowfalke = new Snowfalke(idWorkerConfig, workerId)
       unstashAll()
       context.become(ready)
-      context.system.scheduler.schedule(0 seconds, heartbeatDuration, self, Ping(workerId))
+      cancelable = context.system.scheduler.schedule(0 seconds, heartbeatDuration, self, Ping(workerId))
     case m: Pong =>
       log.debug(m.toString)
     case m: Ping =>
