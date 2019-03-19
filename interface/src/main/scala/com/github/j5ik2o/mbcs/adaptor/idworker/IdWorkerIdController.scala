@@ -2,13 +2,13 @@ package com.github.j5ik2o.mbcs.adaptor.idworker
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 
-import akka.actor.{ActorLogging, Props}
-import akka.persistence.{PersistentActor, SnapshotOffer}
-import com.github.j5ik2o.mbcs.adaptor.idworker.IdWorkerIdController.Event.{IdBorrowed, IdReturned}
+import akka.actor.{ ActorLogging, Props }
+import akka.persistence.{ PersistentActor, SnapshotOffer }
+import com.github.j5ik2o.mbcs.adaptor.idworker.IdWorkerIdController.Event.{ IdBorrowed, IdReturned }
 import com.github.j5ik2o.mbcs.adaptor.idworker.IdWorkerIdController.Protocol._
-import com.google.common.cache.{Cache, CacheBuilder}
-import scala.collection.JavaConverters._
+import com.google.common.cache.{ Cache, CacheBuilder }
 
+import scala.collection.JavaConverters._
 import scala.util.Random
 
 object IdWorkerIdController {
@@ -48,12 +48,15 @@ object IdWorkerIdController {
 
 class IdWorkerIdController(minId: Long, maxId: Long) extends PersistentActor with ActorLogging {
 
-  private val cache: Cache[Long, Instant] = CacheBuilder.newBuilder()
-    .expireAfterWrite(30, TimeUnit.SECONDS).build().asInstanceOf[Cache[Long, Instant]]
+  private val cache: Cache[Long, Instant] = CacheBuilder
+    .newBuilder()
+    .expireAfterWrite(30, TimeUnit.SECONDS)
+    .build()
+    .asInstanceOf[Cache[Long, Instant]]
 
   private def scalaMap = cache.asMap().asScala.toMap
 
-  private var counter: Long                   = 1L
+  private var counter: Long = 1L
 
   override def persistenceId: String = IdWorkerIdController.name
 

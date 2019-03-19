@@ -1,12 +1,11 @@
 package com.github.j5ik2o.mbcs.adaptor.idworker
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Cancellable, Props, Stash}
-import com.github.j5ik2o.mbcs.adaptor.idworker.IdWorker.{GenerateId, IdGenerated}
-import com.github.j5ik2o.mbcs.adaptor.idworker.IdWorkerIdController.Protocol._
-import com.github.j5ik2o.mbcs.domain.model.ULID
+import akka.actor.{ Actor, ActorLogging, Props }
+import com.github.j5ik2o.mbcs.adaptor.idworker.IdWorker.{ GenerateId, IdGenerated }
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
+import scala.util.Random
 
 @SerialVersionUID(1L)
 class InvalidSystemClock(message: String) extends Exception(message)
@@ -17,7 +16,7 @@ case class IdWorkerConfig(dataCenterId: Long,
                           sequenceBits: Long = 12L,
                           twepoch: Long = 1288834974657L)
 
-class Snowfalke(val idWorkerConfig: IdWorkerConfig, val workerId: Long) {
+class Snowfalke(val idWorkerConfig: IdWorkerConfig) {
   private[this] val logger = LoggerFactory.getLogger(getClass)
 
   private[this] var sequence: Long  = 0L
@@ -31,15 +30,17 @@ class Snowfalke(val idWorkerConfig: IdWorkerConfig, val workerId: Long) {
 
   private[this] var lastTimestamp = -1L
 
-  if (workerId > maxWorkerId || workerId < 0) {
-    throw new IllegalArgumentException("worker Id can't be greater than %d or less than 0".format(maxWorkerId))
-  }
-
   if (idWorkerConfig.dataCenterId > maxDataCenterId || idWorkerConfig.dataCenterId < 0) {
     throw new IllegalArgumentException("datacenter Id can't be greater than %d or less than 0".format(maxDataCenterId))
   }
 
-  def generateId(): Long = {
+  def generateId(workerId: Long): Long = {
+    if (workerId > maxWorkerId || workerId < 0) {
+      throw new IllegalArgumentException(
+        "worker Id (%d) can't be greater than %d or less than 0".format(workerId, maxWorkerId)
+      )
+    }
+
     var timestamp = timeGen()
 
     if (timestamp < lastTimestamp) {
@@ -79,58 +80,30 @@ class Snowfalke(val idWorkerConfig: IdWorkerConfig, val workerId: Long) {
 
 object IdWorker {
 
-  def props(idWorkerConfig: IdWorkerConfig, idWorkerIdController: ActorRef) =
-    Props(new IdWorker(idWorkerConfig, idWorkerIdController))
+  def props(idWorkerConfig: IdWorkerConfig) =
+    Props(new IdWorker(idWorkerConfig))
 
-  def name(id: ULID): String = s"id-worker-${id.asString}"
+  def name(id: Long): String = s"id-worker-$id"
 
   trait CommandRequest {
-    def idWorkerId: ULID
+    def idWorkerId: Long
   }
-  case class GenerateId(idWorkerId: ULID) extends CommandRequest
+  case class GenerateId() extends CommandRequest {
+    override val idWorkerId: Long = Random.nextInt(32).toLong
+  }
   case class IdGenerated(id: Long)
 
 }
 
-class IdWorker(val idWorkerConfig: IdWorkerConfig, idWorkerIdController: ActorRef, heartbeatDuration: FiniteDuration = 1 seconds)
+class IdWorker(val idWorkerConfig: IdWorkerConfig, heartbeatDuration: FiniteDuration = 1 seconds)
     extends Actor
-    with ActorLogging
-    with Stash {
-  import context.dispatcher
+    with ActorLogging {
 
-  private var snowfalke: Snowfalke = _
-  private var cancelable: Cancellable = _
-
-  override def preStart(): Unit = {
-    super.preStart()
-    idWorkerIdController ! BorrowId
-  }
-
-  override def postStop(): Unit = {
-    cancelable.cancel()
-    idWorkerIdController ! ReturnId(snowfalke.workerId)
-    super.postStop()
-  }
-
-  def ready: Receive = {
-    case GenerateId(_) =>
-      sender() ! IdGenerated(snowfalke.generateId())
-  }
+  private val snowfalke: Snowfalke = new Snowfalke(idWorkerConfig)
 
   override def receive: Receive = {
-    case BorrowIdSucceeded(workerId) =>
-      log.debug(s"BorrowIdSucceeded($workerId)")
-      snowfalke = new Snowfalke(idWorkerConfig, workerId)
-      unstashAll()
-      context.become(ready)
-      cancelable = context.system.scheduler.schedule(0 seconds, heartbeatDuration, self, Ping(workerId))
-    case m: Pong =>
-      log.debug(m.toString)
-    case m: Ping =>
-      log.debug(m.toString)
-      idWorkerIdController ! m
-    case msg =>
-      stash()
+    case m: GenerateId =>
+      sender() ! IdGenerated(snowfalke.generateId(m.idWorkerId))
   }
 
 }

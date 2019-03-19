@@ -1,17 +1,16 @@
 package com.github.j5ik2o.mbcs.adaptor.idworker
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props, SupervisorStrategy}
-import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
+import akka.actor.{ Actor, ActorRef, ActorSystem, Props, SupervisorStrategy }
+import akka.cluster.sharding.{ ClusterSharding, ClusterShardingSettings }
 
 object ShardedIdWorkers {
   def props: Props = Props(new ShardedIdWorkers())
   def name: String = "sharded-id-workers"
 
-  def startShardRegion(idWorkerConfig: IdWorkerConfig,
-                       idWorkerIdController: ActorRef)(implicit system: ActorSystem): ActorRef = {
+  def startShardRegion(idWorkerConfig: IdWorkerConfig)(implicit system: ActorSystem): ActorRef = {
     val actorRef = ClusterSharding(system).start(
       ShardedIdWorker.shardName,
-      Props(new SupervisorActor(ShardedIdWorker.props(idWorkerConfig, idWorkerIdController), SupervisorStrategy.defaultStrategy)),
+      Props(new SupervisorActor(ShardedIdWorker.props(idWorkerConfig), SupervisorStrategy.defaultStrategy)),
       ClusterShardingSettings(system),
       ShardedIdWorker.extractEntityId,
       ShardedIdWorker.extractShardId

@@ -5,7 +5,6 @@ import akka.actor.ActorSystem
 import akka.testkit.{ ImplicitSender, TestKit }
 import com.github.j5ik2o.mbcs.adaptor.idworker.IdWorker.{ GenerateId, IdGenerated }
 import com.github.j5ik2o.mbcs.adaptor.utils.DynamoDBSpecSupport
-import com.github.j5ik2o.mbcs.domain.model.ULID
 import com.github.j5ik2o.reactive.aws.dynamodb.DynamoDBAsyncClientV2
 import org.scalatest.{ FreeSpecLike, Matchers }
 import software.amazon.awssdk.auth.credentials.{ AwsBasicCredentials, StaticCredentialsProvider }
@@ -41,15 +40,14 @@ class IdWorkerSpec
 
   "IdWorkerSpec" - {
     "generateId" in {
-      val idWorkerIdControllerRef = system.actorOf(IdWorkerIdController.props(1, 32))
-      val idWorkerRef             = system.actorOf(IdWorker.props(IdWorkerConfig(dataCenterId = 1L), idWorkerIdControllerRef))
-      idWorkerRef ! GenerateId(ULID.generate)
+      val idWorkerRef = system.actorOf(IdWorker.props(IdWorkerConfig(dataCenterId = 1L)))
+      idWorkerRef ! GenerateId()
       expectMsgClass(classOf[IdGenerated])
       Thread.sleep(1000 * 5)
-      idWorkerRef ! GenerateId(ULID.generate)
+      idWorkerRef ! GenerateId()
       expectMsgClass(classOf[IdGenerated])
       Thread.sleep(1000 * 5)
-      idWorkerRef ! GenerateId(ULID.generate)
+      idWorkerRef ! GenerateId()
       expectMsgClass(classOf[IdGenerated])
 
     }

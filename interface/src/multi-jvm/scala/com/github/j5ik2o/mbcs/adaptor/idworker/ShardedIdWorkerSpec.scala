@@ -7,20 +7,16 @@ import akka.persistence.Persistence
 import akka.remote.testconductor.RoleName
 import akka.remote.testkit.MultiNodeSpec
 import akka.testkit.ImplicitSender
-import com.github.j5ik2o.mbcs.adaptor.idworker.IdWorker.{GenerateId, IdGenerated}
+import com.github.j5ik2o.mbcs.adaptor.idworker.IdWorker.{ GenerateId, IdGenerated }
 import com.github.j5ik2o.mbcs.adaptor.utils.DynamoDBSpecSupport
-import com.github.j5ik2o.mbcs.domain.model.ULID
 import com.github.j5ik2o.reactive.aws.dynamodb.DynamoDBAsyncClientV2
 import org.scalatest.BeforeAndAfterAll
-import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
+import software.amazon.awssdk.auth.credentials.{ AwsBasicCredentials, StaticCredentialsProvider }
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 
 import scala.concurrent.duration._
 
-class ShardedIdWorkerSpecNode1
-    extends ShardedIdWorkerSpec
-    with BeforeAndAfterAll
-    with DynamoDBSpecSupport {
+class ShardedIdWorkerMultiJvmNode1 extends ShardedIdWorkerSpec with BeforeAndAfterAll with DynamoDBSpecSupport {
   implicit val pc: PatienceConfig = PatienceConfig(20 seconds, 1 seconds)
 
   override protected lazy val dynamoDBPort: Int = 8000
@@ -41,24 +37,17 @@ class ShardedIdWorkerSpecNode1
     super.beforeAll()
     createTable()
   }
-  override def afterAll: Unit  = {
+  override def afterAll: Unit = {
     // deleteTable()
     super.afterAll()
   }
 }
 
-class ShardedIdWorkerSpecNode2 extends ShardedIdWorkerSpec
+class ShardedIdWorkerMultiJvmNode2 extends ShardedIdWorkerSpec
 
-class ShardedIdWorkerSpecNode3 extends ShardedIdWorkerSpec
+class ShardedIdWorkerMultiJvmNode3 extends ShardedIdWorkerSpec
 
-
-
-
-
-class ShardedIdWorkerSpec
-    extends MultiNodeSpec(MultiNodeSampleConfig)
-    with STMultiNodeSpecSupport
-    with ImplicitSender {
+class ShardedIdWorkerSpec extends MultiNodeSpec(MultiNodeSampleConfig) with STMultiNodeSpecSupport with ImplicitSender {
   import MultiNodeSampleConfig._
   override def initialParticipants: Int = roles.size
 
@@ -77,13 +66,11 @@ class ShardedIdWorkerSpec
         join(node2, node1)
         join(node3, node1)
         enterBarrier("cluster joined")
-        IdWorkerIdControllerSingleton.singletonManager(0, 31)
         enterBarrier("singletonManager start")
         runOn(node1, node2, node3) {
-          val ddWorkerIdControllerProxy = system.actorOf(IdWorkerIdControllerProxy.props(ULID.generate))
-          ShardedIdWorkers.startShardRegion(IdWorkerConfig(dataCenterId = 1L), ddWorkerIdControllerProxy)
+          ShardedIdWorkers.startShardRegion(IdWorkerConfig(dataCenterId = 1L))
           val shardedIdWorkers = system.actorOf(ShardedIdWorkers.props)
-          shardedIdWorkers ! GenerateId(ULID.generate)
+          shardedIdWorkers ! GenerateId()
           val result = expectMsgClass(classOf[IdGenerated])
           log.debug(result.toString)
         }

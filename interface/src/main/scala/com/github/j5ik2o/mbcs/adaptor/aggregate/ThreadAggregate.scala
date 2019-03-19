@@ -1,14 +1,15 @@
 package com.github.j5ik2o.mbcs.adaptor.aggregate
 
-import akka.actor.{ActorLogging, Props}
+import akka.actor.{ ActorLogging, Props }
 import akka.persistence.PersistentActor
 import com.github.j5ik2o.mbcs.adaptor.aggregate.ThreadAggregate.Protocol.CreateThread
-import com.github.j5ik2o.mbcs.domain.model.{Thread, ThreadId, ThreadRef, ThreadTitle}
+import com.github.j5ik2o.mbcs.domain.model.{ MemberId, Thread, ThreadId, ThreadRef, ThreadTitle, UserAccountId }
 
 object ThreadAggregate {
 
   def props(threadId: ThreadId): Props = Props(new ThreadAggregate(threadId))
-  def name(threadId: ThreadId) = s"thread-${threadId.asString}"
+
+  def name(threadId: ThreadId): String = s"thread-${threadId.asString}"
 
   object Protocol {
     sealed trait ThreadCommand {
@@ -16,6 +17,8 @@ object ThreadAggregate {
     }
     case class CreateThread(threadId: ThreadId, title: ThreadTitle, parentThreadRef: Option[ThreadRef])
         extends ThreadCommand
+    case class AddMembers(threadId: ThreadId, memberIds: Seq[UserAccountId]) extends ThreadCommand
+    case class RemoveMembers(threadId: ThreadId, memberIds: Seq[MemberId])   extends ThreadCommand
   }
 
 }
@@ -34,7 +37,4 @@ class ThreadAggregate(threadId: ThreadId) extends PersistentActor with ActorLogg
 
   override def receiveRecover: Receive = ???
 
-  override def receive: Receive = {
-
-  }
 }
