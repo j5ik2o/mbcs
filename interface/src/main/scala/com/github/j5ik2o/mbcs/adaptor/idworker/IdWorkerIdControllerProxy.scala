@@ -7,6 +7,7 @@ import akka.cluster.singleton.{
   ClusterSingletonProxy,
   ClusterSingletonProxySettings
 }
+import com.github.j5ik2o.mbcs.adaptor.utils.SupervisorActor
 import com.github.j5ik2o.mbcs.domain.model.ULID
 
 object IdWorkerIdControllerSingleton {

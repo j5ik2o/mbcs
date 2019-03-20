@@ -2,6 +2,7 @@ package com.github.j5ik2o.mbcs.adaptor.idworker
 
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props, SupervisorStrategy }
 import akka.cluster.sharding.{ ClusterSharding, ClusterShardingSettings }
+import com.github.j5ik2o.mbcs.adaptor.utils.SupervisorActor
 
 object ShardedIdWorkers {
   def props: Props = Props(new ShardedIdWorkers())

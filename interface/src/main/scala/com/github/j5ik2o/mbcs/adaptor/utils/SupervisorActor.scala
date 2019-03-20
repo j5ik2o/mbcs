@@ -1,4 +1,5 @@
-package com.github.j5ik2o.mbcs.adaptor.idworker
+package com.github.j5ik2o.mbcs.adaptor.utils
+
 import akka.actor.{ Actor, Props, SupervisorStrategy }
 
 class SupervisorActor(childProps: Props, override val supervisorStrategy: SupervisorStrategy) extends Actor {
