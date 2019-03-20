@@ -1,36 +1,52 @@
 package com.github.j5ik2o.mbcs.adaptor.idworker
 
-import akka.actor.{ Actor, ActorRef, ActorSystem, Props, SupervisorStrategy }
-import akka.cluster.sharding.{ ClusterSharding, ClusterShardingSettings }
+import akka.actor.{ ActorRef, ActorSystem, Props, ReceiveTimeout, SupervisorStrategy }
+import akka.cluster.sharding.{ ClusterSharding, ClusterShardingSettings, ShardRegion }
+import akka.cluster.sharding.ShardRegion.Passivate
+import com.github.j5ik2o.mbcs.adaptor.idworker.IdWorker.GenerateId
+import com.github.j5ik2o.mbcs.adaptor.idworker.ShardedIdWorkers.StopIdWorker
 import com.github.j5ik2o.mbcs.adaptor.utils.SupervisorActor
 
 object ShardedIdWorkers {
-  def props: Props = Props(new ShardedIdWorkers())
-  def name: String = "sharded-id-workers"
+  def props(idWorkerConfig: IdWorkerConfig): Props =
+    Props(new ShardedIdWorkers(idWorkerConfig))
+
+  val shardName = "id-worker"
+
+  case object StopIdWorker
+
+  val extractEntityId: ShardRegion.ExtractEntityId = {
+    case cmd: GenerateId =>
+      (s"${cmd.dataCenterId}-${cmd.workerId}", cmd)
+  }
+
+  val extractShardId: ShardRegion.ExtractShardId = {
+    case cmd: GenerateId =>
+      cmd.dataCenterId.toString
+  }
 
   def startShardRegion(idWorkerConfig: IdWorkerConfig)(implicit system: ActorSystem): ActorRef = {
     val actorRef = ClusterSharding(system).start(
-      ShardedIdWorker.shardName,
-      Props(new SupervisorActor(ShardedIdWorker.props(idWorkerConfig), SupervisorStrategy.defaultStrategy)),
+      shardName,
+      Props(new SupervisorActor(ShardedIdWorkers.props(idWorkerConfig), SupervisorStrategy.defaultStrategy)),
       ClusterShardingSettings(system),
-      ShardedIdWorker.extractEntityId,
-      ShardedIdWorker.extractShardId
+      extractEntityId,
+      extractShardId
     )
     actorRef
   }
 
-  def getShardRegionRef(system: ActorSystem): ActorRef =
-    ClusterSharding(system).shardRegion(ShardedIdWorker.shardName)
-
 }
 
-class ShardedIdWorkers extends Actor {
+class ShardedIdWorkers(idWorkerConfig: IdWorkerConfig) extends IdWorkers(idWorkerConfig) {
 
-  private val shardRegion = ShardedIdWorkers.getShardRegionRef(context.system)
-
-  override def receive: Receive = {
-    case msg =>
-      shardRegion forward msg
+  override def unhandled(message: Any): Unit = message match {
+    case ReceiveTimeout =>
+      context.parent ! Passivate(stopMessage = StopIdWorker)
+    case StopIdWorker =>
+      context.stop(self)
+    case any =>
+      super.unhandled(any)
   }
 
 }

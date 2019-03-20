@@ -4,22 +4,19 @@ import akka.actor.{ Actor, ActorLogging, Props }
 import com.github.j5ik2o.mbcs.adaptor.idworker.IdWorker.{ GenerateId, IdGenerated }
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.duration._
-import scala.util.Random
-
 @SerialVersionUID(1L)
-class InvalidSystemClock(message: String) extends Exception(message)
+case class InvalidSystemClock(message: String, timestamp: Long, lastSequence: Long) extends Exception(message)
 
-case class IdWorkerConfig(dataCenterId: Long,
-                          workerIdBits: Long = 5L,
+case class IdWorkerConfig(workerIdBits: Long = 5L,
                           dataCenterIdBits: Long = 5L,
                           sequenceBits: Long = 12L,
                           twepoch: Long = 1288834974657L)
 
-class Snowfalke(val idWorkerConfig: IdWorkerConfig) {
+case class NextId(id: Option[Long], lastTimestamp: Long = -1L, sequence: Long = 0L)
+
+class Snowfalke(val idWorkerConfig: IdWorkerConfig, val dataCenterId: Long, val workerId: Long) {
   private[this] val logger = LoggerFactory.getLogger(getClass)
 
-  private[this] var sequence: Long  = 0L
   private[this] val maxWorkerId     = -1L ^ (-1L << idWorkerConfig.workerIdBits)
   private[this] val maxDataCenterId = -1L ^ (-1L << idWorkerConfig.dataCenterIdBits)
 
@@ -28,50 +25,46 @@ class Snowfalke(val idWorkerConfig: IdWorkerConfig) {
   private[this] val timestampLeftShift = idWorkerConfig.sequenceBits + idWorkerConfig.workerIdBits + idWorkerConfig.dataCenterIdBits
   private[this] val sequenceMask       = -1L ^ (-1L << idWorkerConfig.sequenceBits)
 
-  private[this] var lastTimestamp = -1L
-
-  if (idWorkerConfig.dataCenterId > maxDataCenterId || idWorkerConfig.dataCenterId < 0) {
-    throw new IllegalArgumentException("datacenter Id can't be greater than %d or less than 0".format(maxDataCenterId))
+  if (dataCenterId > maxDataCenterId || dataCenterId < 0) {
+    throw new IllegalArgumentException(
+      "datacenter Id (%d) can't be greater than %d or less than 0".format(dataCenterId, maxDataCenterId)
+    )
   }
 
-  def generateId(workerId: Long): Long = {
-    if (workerId > maxWorkerId || workerId < 0) {
-      throw new IllegalArgumentException(
-        "worker Id (%d) can't be greater than %d or less than 0".format(workerId, maxWorkerId)
-      )
-    }
+  if (workerId > maxWorkerId || workerId < 0) {
+    throw new IllegalArgumentException(
+      "worker Id (%d) can't be greater than %d or less than 0".format(workerId, maxWorkerId)
+    )
+  }
 
-    var timestamp = timeGen()
+  def generateId(lastTimestamp: Long, currentSequence: Long): NextId = {
+    val timestamp = timeGen()
 
     if (timestamp < lastTimestamp) {
       logger.error("clock is moving backwards.  Rejecting requests until %d.", lastTimestamp)
       throw new InvalidSystemClock(
-        "Clock moved backwards.  Refusing to generate id for %d milliseconds".format(lastTimestamp - timestamp)
+        "Clock moved backwards.  Refusing to generate id for %d milliseconds".format(lastTimestamp - timestamp),
+        lastTimestamp,
+        currentSequence
       )
     }
 
-    if (lastTimestamp == timestamp) {
-      sequence = (sequence + 1) & sequenceMask
-      if (sequence == 0) {
-        timestamp = tilNextMillis(lastTimestamp)
-      }
+    require(currentSequence < sequenceMask + 1)
+
+    val nextSequence: Option[Long] = if (lastTimestamp == timestamp) {
+      val s = (currentSequence + 1) & sequenceMask
+      if (s == 0) None else Some(s)
     } else {
-      sequence = 0
+      Some(0)
     }
 
-    lastTimestamp = timestamp
-    ((timestamp - idWorkerConfig.twepoch) << timestampLeftShift) |
-    (idWorkerConfig.dataCenterId << dataCenterIdShift) |
-    (workerId << workerIdShift) |
-    sequence
-  }
-
-  protected def tilNextMillis(lastTimestamp: Long): Long = {
-    var timestamp = timeGen()
-    while (timestamp <= lastTimestamp) {
-      timestamp = timeGen()
+    val id = nextSequence.map { s =>
+      ((timestamp - idWorkerConfig.twepoch) << timestampLeftShift) |
+      (dataCenterId << dataCenterIdShift) |
+      (workerId << workerIdShift) | s
     }
-    timestamp
+
+    NextId(id, timestamp, nextSequence.getOrElse(0))
   }
 
   protected def timeGen(): Long = System.currentTimeMillis()
@@ -80,30 +73,60 @@ class Snowfalke(val idWorkerConfig: IdWorkerConfig) {
 
 object IdWorker {
 
-  def props(idWorkerConfig: IdWorkerConfig) =
-    Props(new IdWorker(idWorkerConfig))
+  def props(idWorkerConfig: IdWorkerConfig, dataCenterId: Long, workerId: Long) =
+    Props(new IdWorker(idWorkerConfig, dataCenterId, workerId))
 
-  def name(id: Long): String = s"id-worker-$id"
+  def name(dataCenterId: Long, workerId: Long): String = s"id-worker-$dataCenterId-$workerId"
 
   trait CommandRequest {
-    def idWorkerId: Long
+    def dataCenterId: Long
+    def workerId: Long
   }
-  case class GenerateId() extends CommandRequest {
-    override val idWorkerId: Long = Random.nextInt(32).toLong
-  }
+  case class GenerateId(dataCenterId: Long, workerId: Long) extends CommandRequest
+
   case class IdGenerated(id: Long)
 
 }
 
-class IdWorker(val idWorkerConfig: IdWorkerConfig, heartbeatDuration: FiniteDuration = 1 seconds)
+class IdWorker(val idWorkerConfig: IdWorkerConfig, val dataCenterId: Long, val workerId: Long)
     extends Actor
     with ActorLogging {
 
-  private val snowfalke: Snowfalke = new Snowfalke(idWorkerConfig)
+  private val snowfalke: Snowfalke = new Snowfalke(idWorkerConfig, dataCenterId, workerId)
 
-  override def receive: Receive = {
+  override def receive: Receive = onMessage(sequenceNumber = 0L, lastTimestamp = -1L)
+
+  private def onMessage(sequenceNumber: Long, lastTimestamp: Long): Receive = {
     case m: GenerateId =>
-      sender() ! IdGenerated(snowfalke.generateId(m.idWorkerId))
+      require(m.dataCenterId == dataCenterId, s"Invalid dataCenterId: ${m.dataCenterId}")
+      require(m.workerId == workerId, s"Invalid workerId: ${m.workerId}")
+      val NextId(idOpt, timestamp, nextSequence) = snowfalke.generateId(lastTimestamp, sequenceNumber)
+      context.become(onMessage(nextSequence, timestamp))
+      idOpt match {
+        case Some(id) =>
+          sender() ! IdGenerated(id)
+        case None =>
+          log.debug("retrying to generate id...")
+          self.tell(m, sender())
+      }
+  }
+
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
+    message match {
+      case Some(msg: GenerateId) =>
+        self forward msg
+      case _ =>
+    }
+    super.preRestart(reason, message)
+  }
+
+  override def postRestart(reason: Throwable): Unit = {
+    reason match {
+      case InvalidSystemClock(_, timestamp, lastSequence) =>
+        context.become(onMessage(lastSequence, timestamp))
+      case _ =>
+    }
+    super.postRestart(reason)
   }
 
 }

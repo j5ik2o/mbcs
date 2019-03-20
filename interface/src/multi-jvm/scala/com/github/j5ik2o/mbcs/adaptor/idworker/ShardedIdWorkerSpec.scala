@@ -68,9 +68,9 @@ class ShardedIdWorkerSpec extends MultiNodeSpec(MultiNodeSampleConfig) with STMu
         enterBarrier("cluster joined")
         enterBarrier("singletonManager start")
         runOn(node1, node2, node3) {
-          ShardedIdWorkers.startShardRegion(IdWorkerConfig(dataCenterId = 1L))
-          val shardedIdWorkers = system.actorOf(ShardedIdWorkers.props)
-          shardedIdWorkers ! GenerateId()
+          ShardedIdWorkers.startShardRegion(IdWorkerConfig())
+          val shardedIdWorkers = system.actorOf(ShardedIdWorkersProxy.props)
+          shardedIdWorkers ! GenerateId(dataCenterId = 1, workerId = 1)
           val result = expectMsgClass(classOf[IdGenerated])
           log.debug(result.toString)
         }

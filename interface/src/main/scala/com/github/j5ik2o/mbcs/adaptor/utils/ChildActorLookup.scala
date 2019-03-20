@@ -7,7 +7,7 @@ trait ChildActorLookup {
   type CommandRequest
 
   protected def childName(childId: ID): String
-  protected def childProps: Props
+  protected def childProps(childId: ID): Props
   protected def toCommandRequestId(commandRequest: CommandRequest): ID
 
   protected def forwardToActor: Actor.Receive = {
@@ -26,5 +26,5 @@ trait ChildActorLookup {
   }
 
   protected def createActor(childId: ID): ActorRef =
-    context.actorOf(childProps, childName(childId))
+    context.actorOf(childProps(childId), childName(childId))
 }
