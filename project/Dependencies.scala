@@ -120,6 +120,7 @@ object Dependencies {
     val monocleCore  = "com.github.julien-truffaut" %% "monocle-core"  % Versions.monocle
     val monocleMacro = "com.github.julien-truffaut" %% "monocle-macro" % Versions.monocle
     val monocleLaw   = "com.github.julien-truffaut" %% "monocle-law"   % Versions.monocle
+    val all = Seq(monocleCore,monocleMacro, monocleLaw % Test)
   }
 
   object Enumeratum {
